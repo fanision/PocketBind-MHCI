@@ -8,13 +8,18 @@ The immediate development target is to beat **NetMHCpan-4.2** under the same loc
 
 This repository currently contains the project notes and development plan from the initial design discussion. Code has not been implemented yet.
 
-Local artifacts used during planning are intentionally not committed:
+Local artifacts are committed through Git LFS:
 
 - `Paper/`: local PDFs and literature notes
 - `Tool/`: local NetMHCpan-4.2 package
 - `Trainning dataset/`: local NetMHCpan-style train/evaluation files
 
-These are ignored because they are large and/or third-party licensed.
+After cloning on a new machine, install Git LFS and fetch the large files:
+
+```bash
+git lfs install
+git lfs pull
+```
 
 ## First Baseline
 
@@ -48,4 +53,3 @@ See [`docs/development_plan.md`](docs/development_plan.md) for details.
 - [`docs/conversation_summary.md`](docs/conversation_summary.md): project conversation and decisions so far
 - [`docs/development_plan.md`](docs/development_plan.md): proposed model, data, and training plan
 - [`docs/netmhcpan42_baseline.md`](docs/netmhcpan42_baseline.md): first baseline plan
-
