@@ -1,0 +1,32 @@
+.DS_Store
+
+# Local literature, tools, and datasets.
+# These are large and/or third-party licensed artifacts. Keep them local and
+# document how to obtain or place them instead of committing them.
+Paper/
+Tool/
+Trainning dataset/
+
+# Python / ML outputs
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+env/
+
+# Training artifacts
+artifacts/
+checkpoints/
+runs/
+wandb/
+lightning_logs/
+outputs/
+*.ckpt
+*.pt
+*.pth
+*.safetensors
+
