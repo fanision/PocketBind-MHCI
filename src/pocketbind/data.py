@@ -35,12 +35,12 @@ def normalize_allele(value: str) -> str | None:
     return None
 
 
-def read_pocketbind_table(path: Path, *, has_context: bool) -> pd.DataFrame:
+def read_pocketbind_table(path: Path, *, has_context: bool, nrows: int | None = None) -> pd.DataFrame:
     names = ["peptide", "label", "allele_raw", "context"]
     if not has_context:
         names = ["peptide", "label", "allele_raw", "context"]
 
-    df = pd.read_csv(path, sep=r"\s+", names=names, engine="python")
+    df = pd.read_csv(path, sep=r"\s+", names=names, engine="python", nrows=nrows)
     df["source_path"] = str(path)
     df["label"] = pd.to_numeric(df["label"], errors="coerce")
     df["allele"] = df["allele_raw"].map(normalize_allele)
@@ -65,4 +65,3 @@ def load_predictions_tsv(path: Path) -> pd.DataFrame:
     from io import StringIO
 
     return pd.read_csv(StringIO("".join(lines)), sep="\t")
-

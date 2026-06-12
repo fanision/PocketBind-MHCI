@@ -77,3 +77,18 @@ PYTHONPATH=src python3 scripts/train_pocketbind.py \
   --hidden-dim 64 \
   --num-layers 1
 ```
+
+Multi-task smoke test:
+
+```bash
+PYTHONPATH=src python3 scripts/train_pocketbind.py \
+  --train-spec "ba=Trainning dataset/NetMHCpan_train/c000_ba" \
+  --train-spec "el=Trainning dataset/NetMHCpan_train/c000_el" \
+  --train-spec "iedb=Trainning dataset/NetMHCpan_train/c000_iedb" \
+  --train-spec "cedar=Trainning dataset/NetMHCpan_train/c000_cedar" \
+  --limit 128 \
+  --epochs 1 \
+  --batch-size 32 \
+  --hidden-dim 64 \
+  --num-layers 1
+```

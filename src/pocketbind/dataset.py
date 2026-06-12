@@ -26,8 +26,15 @@ class PocketBindFrameBuilder:
                     out[normalized] = pseudo
         return out
 
-    def load(self, path: Path, *, task: str, has_context: bool) -> pd.DataFrame:
-        df = read_pocketbind_table(path, has_context=has_context)
+    def load(
+        self,
+        path: Path,
+        *,
+        task: str,
+        has_context: bool,
+        nrows: int | None = None,
+    ) -> pd.DataFrame:
+        df = read_pocketbind_table(path, has_context=has_context, nrows=nrows)
         df = df.loc[df["has_valid_allele"]].copy()
         df["task"] = task
         df["hla_pseudoseq"] = df["allele"].map(self.pseudoseqs)
@@ -75,4 +82,3 @@ class EncodedPocketBindDataset:
             "allele": row.allele,
             "peptide": row.peptide,
         }
-

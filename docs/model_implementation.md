@@ -7,7 +7,8 @@ Generated on 2026-06-12.
 - `src/pocketbind/encoding.py`: amino-acid vocabulary, fixed-length peptide/HLA/context encoding.
 - `src/pocketbind/dataset.py`: HLA pseudosequence join, allele normalization, torch-compatible encoded dataset.
 - `src/pocketbind/model.py`: first PocketBind-MHCI neural architecture.
-- `scripts/train_pocketbind.py`: first training entrypoint.
+- `scripts/train_pocketbind.py`: single-task and multi-task training entrypoint.
+- `scripts/predict_pocketbind.py`: checkpoint prediction entrypoint.
 
 ## Model v1
 
@@ -76,6 +77,46 @@ Result:
 epoch=1 train_loss=0.711157 val_loss=0.682929 rows=128 device=cpu
 ```
 
+Four-task smoke train:
+
+```bash
+PYTHONPATH=src python3 scripts/train_pocketbind.py \
+  --train-spec "ba=Trainning dataset/NetMHCpan_train/c000_ba" \
+  --train-spec "el=Trainning dataset/NetMHCpan_train/c000_el" \
+  --train-spec "iedb=Trainning dataset/NetMHCpan_train/c000_iedb" \
+  --train-spec "cedar=Trainning dataset/NetMHCpan_train/c000_cedar" \
+  --limit 128 \
+  --epochs 1 \
+  --batch-size 32 \
+  --hidden-dim 64 \
+  --num-layers 1 \
+  --out artifacts/pocketbind/smoke_multitask_el.pt
+```
+
+Result:
+
+```text
+loaded task=ba rows=106
+loaded task=el rows=128
+loaded task=iedb rows=107
+loaded task=cedar rows=128
+epoch=1 train_loss=0.926232 val_loss=0.839380 rows=469 device=cpu
+```
+
+Prediction smoke test:
+
+```bash
+PYTHONPATH=src python3 scripts/predict_pocketbind.py \
+  --checkpoint artifacts/pocketbind/smoke_multitask_el.pt \
+  --input "Trainning dataset/NetMHCpan_train/c000_cedar" \
+  --task cedar \
+  --limit 32 \
+  --batch-size 16 \
+  --hidden-dim 64 \
+  --num-layers 1 \
+  --out artifacts/pocketbind/smoke_cedar_predictions.tsv
+```
+
 ## Valid Rows After HLA/Pseudosequence Filtering
 
 For fold `c000`:
@@ -90,5 +131,5 @@ For fold `c000`:
 
 - Training ran on CPU in this environment. MPS/GPU support should be checked on the target training machine.
 - `EncodedPocketBindDataset` currently returns Python lists and uses a simple collate function; performance should be improved before full EL pretraining.
-- The first training script supports one task at a time; multi-task sampling is the next step.
-
+- Multi-task training currently concatenates per-task frames, then uses shuffled mini-batches and masked per-task losses.
+- Full EL training still needs a faster dataset implementation than pandas-backed row access.
