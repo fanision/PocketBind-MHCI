@@ -211,6 +211,35 @@ PYTHONPATH=src python3 scripts/predict_pocketbind.py \
   --out artifacts/pocketbind/smoke_cedar_predictions.tsv
 ```
 
+Checkpoint evaluation suite smoke test:
+
+```bash
+PYTHONPATH=src python3 scripts/evaluate_pocketbind_suite.py \
+  --checkpoint artifacts/pocketbind/multitask_c000_sampled.pt \
+  --out-dir artifacts/pocketbind_eval/suite_smoke \
+  --limit 64 \
+  --sets c000_ba,cedar_test
+```
+
+Full CEDAR external evaluation for the sampled multi-task checkpoint:
+
+```bash
+PYTHONPATH=src python3 scripts/evaluate_pocketbind_checkpoint.py \
+  --checkpoint artifacts/pocketbind/multitask_c000_sampled.pt \
+  --input "Trainning dataset/NetMHCpan_eval/cedar_test" \
+  --task cedar \
+  --out-dir artifacts/pocketbind_eval/cedar_test_multitask_sampled
+```
+
+Result:
+
+```text
+PocketBind-MHCI cedar_test ROC-AUC=0.612270 AUC0.1=0.537153 AUPRC=0.298582 PPV@N=0.304762
+NetMHCpan-4.2  cedar_test ROC-AUC=0.899134 AUC0.1=0.783096 AUPRC=0.765643 PPV@N=0.742857
+```
+
+This confirms the evaluation pipeline is working; the current sampled checkpoint is not competitive yet.
+
 ## Valid Rows After HLA/Pseudosequence Filtering
 
 For fold `c000`:

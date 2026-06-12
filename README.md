@@ -108,3 +108,13 @@ Sampled medium path:
 PYTHONPATH=src python3 scripts/train_pocketbind.py @configs/el_pretrain_c000_sampled.args
 PYTHONPATH=src python3 scripts/train_pocketbind.py @configs/ba_finetune_from_el_c000_sampled.args
 ```
+
+Evaluate a checkpoint against NetMHCpan baseline:
+
+```bash
+PYTHONPATH=src python3 scripts/evaluate_pocketbind_checkpoint.py \
+  --checkpoint artifacts/pocketbind/multitask_c000_sampled.pt \
+  --input "Trainning dataset/NetMHCpan_eval/cedar_test" \
+  --task cedar \
+  --out-dir artifacts/pocketbind_eval/cedar_test_multitask_sampled
+```
