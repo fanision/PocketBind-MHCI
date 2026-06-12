@@ -50,7 +50,11 @@ def ppv_at_n(y_true: pd.Series, y_score: pd.Series, n: int | None = None) -> flo
 
 
 def evaluate(df: pd.DataFrame, *, label_col: str, score_col: str, task: str) -> dict[str, float]:
-    out = {"n": float(len(df)), "positives": float((df[label_col] > 0).sum())}
+    if task == "ba":
+        positives = float((df[label_col] >= 0.426).sum())
+    else:
+        positives = float((df[label_col] > 0).sum())
+    out = {"n": float(len(df)), "positives": positives}
     if task == "ba":
         out.update(regression_metrics(df[label_col], df[score_col]))
         out.update(binary_metrics((df[label_col] >= 0.426).astype(int), df[score_col]))

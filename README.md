@@ -54,6 +54,7 @@ See [`docs/development_plan.md`](docs/development_plan.md) for details.
 - [`docs/development_plan.md`](docs/development_plan.md): proposed model, data, and training plan
 - [`docs/netmhcpan42_baseline.md`](docs/netmhcpan42_baseline.md): first baseline plan
 - [`docs/baseline_results.md`](docs/baseline_results.md): first NetMHCpan-4.2 baseline results
+- [`docs/model_implementation.md`](docs/model_implementation.md): current PocketBind-MHCI v1 model and smoke tests
 
 ## Baseline Smoke Test
 
@@ -62,4 +63,17 @@ PYTHONPATH=src python3 scripts/run_netmhcpan_baseline.py \
   --input "Trainning dataset/NetMHCpan_eval/cedar_test" \
   --task cedar \
   --limit 20
+```
+
+## Model Smoke Test
+
+```bash
+PYTHONPATH=src python3 scripts/train_pocketbind.py \
+  --train "Trainning dataset/NetMHCpan_train/c000_ba" \
+  --task ba \
+  --limit 128 \
+  --epochs 1 \
+  --batch-size 16 \
+  --hidden-dim 64 \
+  --num-layers 1
 ```
