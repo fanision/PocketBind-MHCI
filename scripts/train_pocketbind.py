@@ -15,8 +15,19 @@ TASK_TO_ID = {task: idx for idx, task in enumerate(TASKS)}
 CONTEXT_TASKS = {"el", "iedb", "cedar"}
 
 
+class ArgumentParser(argparse.ArgumentParser):
+    def convert_arg_line_to_args(self, arg_line: str):
+        line = arg_line.strip()
+        if not line or line.startswith("#"):
+            return []
+        return [line]
+
+
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train PocketBind-MHCI v1.")
+    parser = ArgumentParser(
+        description="Train PocketBind-MHCI v1.",
+        fromfile_prefix_chars="@",
+    )
     parser.add_argument("--train", type=Path, help="Single-task training file.")
     parser.add_argument("--task", choices=TASKS, help="Task for --train.")
     parser.add_argument(
@@ -42,6 +53,12 @@ def parse_args() -> argparse.Namespace:
         default="ba=1.0,el=0.3,iedb=0.5,cedar=0.5",
         help="Comma-separated loss weights.",
     )
+    parser.add_argument(
+        "--auto-pos-weight",
+        action="store_true",
+        help="Use negative/positive label ratios as BCE pos_weight for classification tasks.",
+    )
+    parser.add_argument("--init-checkpoint", type=Path, default=None)
     parser.add_argument("--out", type=Path, default=Path("artifacts/pocketbind/checkpoint.pt"))
     return parser.parse_args()
 
@@ -92,9 +109,16 @@ def collate(batch: list[dict]):
     ]
     out = {}
     for key in tensor_keys:
-        dtype = torch.long
-        out[key] = torch.tensor([item[key] for item in batch], dtype=dtype)
-    out["label"] = torch.tensor([item["label"] for item in batch], dtype=torch.float32)
+        values = [item[key] for item in batch]
+        if torch.is_tensor(values[0]):
+            out[key] = torch.stack(values).long()
+        else:
+            out[key] = torch.tensor(values, dtype=torch.long)
+    labels = [item["label"] for item in batch]
+    if torch.is_tensor(labels[0]):
+        out["label"] = torch.stack(labels).float()
+    else:
+        out["label"] = torch.tensor(labels, dtype=torch.float32)
     return out
 
 
@@ -114,6 +138,22 @@ def compute_multitask_loss(outputs, labels, task_ids, *, task_weights, loss_fns)
     if not losses:
         raise RuntimeError("Batch did not contain any known task ids.")
     return torch.stack(losses).sum(), parts
+
+
+def build_loss_fns(frame: pd.DataFrame, *, auto_pos_weight: bool, device):
+    import torch
+
+    losses = {"ba": torch.nn.HuberLoss()}
+    for task in ["el", "iedb", "cedar"]:
+        pos_weight = None
+        if auto_pos_weight:
+            labels = frame.loc[frame["task"] == task, "label"]
+            positives = int((labels > 0).sum())
+            negatives = int((labels <= 0).sum())
+            if positives > 0 and negatives > 0:
+                pos_weight = torch.tensor([negatives / positives], dtype=torch.float32, device=device)
+        losses[task] = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    return losses
 
 
 def main() -> None:
@@ -162,13 +202,12 @@ def main() -> None:
         num_heads=4,
         num_layers=args.num_layers,
     ).to(device)
+    if args.init_checkpoint is not None:
+        checkpoint = torch.load(args.init_checkpoint, map_location=device)
+        model.load_state_dict(checkpoint["model"], strict=True)
+        print(f"loaded init checkpoint={args.init_checkpoint}")
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
-    loss_fns = {
-        "ba": torch.nn.HuberLoss(),
-        "el": torch.nn.BCEWithLogitsLoss(),
-        "iedb": torch.nn.BCEWithLogitsLoss(),
-        "cedar": torch.nn.BCEWithLogitsLoss(),
-    }
+    loss_fns = build_loss_fns(frame, auto_pos_weight=args.auto_pos_weight, device=device)
 
     for epoch in range(args.epochs):
         model.train()
@@ -231,8 +270,14 @@ def main() -> None:
         {
             "model": model.state_dict(),
             "vocab_size": vocab.size,
+            "model_config": {
+                "hidden_dim": args.hidden_dim,
+                "num_heads": 4,
+                "num_layers": args.num_layers,
+            },
             "tasks": [task for task, _ in specs],
             "task_weights": task_weights,
+            "auto_pos_weight": args.auto_pos_weight,
         },
         args.out,
     )

@@ -1,0 +1,18 @@
+--train-spec
+el=Trainning dataset/NetMHCpan_train/c000_el
+--limit
+2048
+--epochs
+1
+--batch-size
+64
+--hidden-dim
+128
+--num-layers
+2
+--task-weights
+el=1.0
+--auto-pos-weight
+--out
+artifacts/pocketbind/el_pretrain_c000_smoke.pt
+

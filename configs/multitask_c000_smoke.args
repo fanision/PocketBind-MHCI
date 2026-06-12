@@ -1,0 +1,24 @@
+--train-spec
+ba=Trainning dataset/NetMHCpan_train/c000_ba
+--train-spec
+el=Trainning dataset/NetMHCpan_train/c000_el
+--train-spec
+iedb=Trainning dataset/NetMHCpan_train/c000_iedb
+--train-spec
+cedar=Trainning dataset/NetMHCpan_train/c000_cedar
+--limit
+512
+--epochs
+1
+--batch-size
+64
+--hidden-dim
+128
+--num-layers
+2
+--task-weights
+ba=1.0,el=0.3,iedb=0.5,cedar=0.5
+--auto-pos-weight
+--out
+artifacts/pocketbind/multitask_c000_smoke.pt
+

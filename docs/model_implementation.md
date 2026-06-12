@@ -103,6 +103,52 @@ loaded task=cedar rows=128
 epoch=1 train_loss=0.926232 val_loss=0.839380 rows=469 device=cpu
 ```
 
+EL pretrain config smoke test:
+
+```bash
+PYTHONPATH=src python3 scripts/train_pocketbind.py \
+  @configs/el_pretrain_c000_smoke.args
+```
+
+Result:
+
+```text
+loaded task=el rows=1643
+epoch=1 train_loss=0.419577 val_loss=0.167470 rows=1643 device=cpu
+```
+
+Four-task config smoke test:
+
+```bash
+PYTHONPATH=src python3 scripts/train_pocketbind.py \
+  @configs/multitask_c000_smoke.args
+```
+
+Result:
+
+```text
+loaded task=ba rows=396
+loaded task=el rows=512
+loaded task=iedb rows=414
+loaded task=cedar rows=512
+epoch=1 train_loss=0.819751 val_loss=0.659208 rows=1834 device=cpu
+```
+
+BA fine-tune from EL checkpoint smoke test:
+
+```bash
+PYTHONPATH=src python3 scripts/train_pocketbind.py \
+  @configs/ba_finetune_from_el_c000_smoke.args
+```
+
+Result:
+
+```text
+loaded task=ba rows=214
+loaded init checkpoint=artifacts/pocketbind/el_pretrain_c000_smoke.pt
+epoch=1 train_loss=0.057812 val_loss=0.025515 rows=214 device=cpu
+```
+
 Prediction smoke test:
 
 ```bash
@@ -132,4 +178,5 @@ For fold `c000`:
 - Training ran on CPU in this environment. MPS/GPU support should be checked on the target training machine.
 - `EncodedPocketBindDataset` currently returns Python lists and uses a simple collate function; performance should be improved before full EL pretraining.
 - Multi-task training currently concatenates per-task frames, then uses shuffled mini-batches and masked per-task losses.
-- Full EL training still needs a faster dataset implementation than pandas-backed row access.
+- Dataset rows are now pre-encoded and cached; if PyTorch is available, numeric fields are cached as tensors.
+- Full EL training may still need streaming or sharded caching on memory-constrained machines.

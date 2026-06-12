@@ -60,25 +60,79 @@ class EncodedPocketBindDataset:
         self.max_hla_len = max_hla_len
         self.max_context_len = max_context_len
         self.task_to_id = {"ba": 0, "el": 1, "iedb": 2, "cedar": 3}
+        self.cache = self._build_cache()
 
-    def __len__(self) -> int:
-        return len(self.frame)
+    def _build_cache(self) -> dict[str, Any]:
+        peptide_ids = []
+        peptide_mask = []
+        hla_ids = []
+        hla_mask = []
+        context_ids = []
+        context_mask = []
+        task_ids = []
+        labels = []
+        peptides = []
+        alleles = []
 
-    def __getitem__(self, idx: int) -> dict[str, Any]:
-        row = self.frame.iloc[idx]
-        peptide_ids, peptide_mask = self.vocab.encode(row.peptide, max_len=self.max_peptide_len)
-        hla_ids, hla_mask = self.vocab.encode(row.hla_pseudoseq, max_len=self.max_hla_len)
-        context = make_context(row.peptide, row.context, flank=self.max_context_len // 2)
-        context_ids, context_mask = self.vocab.encode(context, max_len=self.max_context_len)
-        return {
+        for row in self.frame.itertuples(index=False):
+            pep_ids, pep_mask = self.vocab.encode(row.peptide, max_len=self.max_peptide_len)
+            mhc_ids, mhc_mask = self.vocab.encode(row.hla_pseudoseq, max_len=self.max_hla_len)
+            context = make_context(row.peptide, row.context, flank=self.max_context_len // 2)
+            ctx_ids, ctx_mask = self.vocab.encode(context, max_len=self.max_context_len)
+            peptide_ids.append(pep_ids)
+            peptide_mask.append(pep_mask)
+            hla_ids.append(mhc_ids)
+            hla_mask.append(mhc_mask)
+            context_ids.append(ctx_ids)
+            context_mask.append(ctx_mask)
+            task_ids.append(self.task_to_id[row.task])
+            labels.append(float(row.label))
+            peptides.append(row.peptide)
+            alleles.append(row.allele)
+
+        cache = {
             "peptide_ids": peptide_ids,
             "peptide_mask": peptide_mask,
             "hla_ids": hla_ids,
             "hla_mask": hla_mask,
             "context_ids": context_ids,
             "context_mask": context_mask,
-            "task_id": self.task_to_id[row.task],
-            "label": float(row.label),
-            "allele": row.allele,
-            "peptide": row.peptide,
+            "task_id": task_ids,
+            "label": labels,
+            "peptide": peptides,
+            "allele": alleles,
+        }
+        try:
+            import torch
+        except ImportError:
+            return cache
+
+        for key in [
+            "peptide_ids",
+            "peptide_mask",
+            "hla_ids",
+            "hla_mask",
+            "context_ids",
+            "context_mask",
+            "task_id",
+        ]:
+            cache[key] = torch.tensor(cache[key], dtype=torch.long)
+        cache["label"] = torch.tensor(cache["label"], dtype=torch.float32)
+        return cache
+
+    def __len__(self) -> int:
+        return len(self.frame)
+
+    def __getitem__(self, idx: int) -> dict[str, Any]:
+        return {
+            "peptide_ids": self.cache["peptide_ids"][idx],
+            "peptide_mask": self.cache["peptide_mask"][idx],
+            "hla_ids": self.cache["hla_ids"][idx],
+            "hla_mask": self.cache["hla_mask"][idx],
+            "context_ids": self.cache["context_ids"][idx],
+            "context_mask": self.cache["context_mask"][idx],
+            "task_id": self.cache["task_id"][idx],
+            "label": self.cache["label"][idx],
+            "allele": self.cache["allele"][idx],
+            "peptide": self.cache["peptide"][idx],
         }

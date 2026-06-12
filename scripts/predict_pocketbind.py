@@ -27,8 +27,16 @@ def collate(batch: list[dict]):
     ]
     out = {}
     for key in tensor_keys:
-        out[key] = torch.tensor([item[key] for item in batch], dtype=torch.long)
-    out["label"] = torch.tensor([item["label"] for item in batch], dtype=torch.float32)
+        values = [item[key] for item in batch]
+        if torch.is_tensor(values[0]):
+            out[key] = torch.stack(values).long()
+        else:
+            out[key] = torch.tensor(values, dtype=torch.long)
+    labels = [item["label"] for item in batch]
+    if torch.is_tensor(labels[0]):
+        out["label"] = torch.stack(labels).float()
+    else:
+        out["label"] = torch.tensor(labels, dtype=torch.float32)
     return out
 
 
@@ -68,11 +76,12 @@ def main() -> None:
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate)
 
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    config = checkpoint.get("model_config", {})
     model = PocketBindModel(
         vocab_size=int(checkpoint.get("vocab_size", vocab.size)),
-        hidden_dim=args.hidden_dim,
-        num_heads=4,
-        num_layers=args.num_layers,
+        hidden_dim=int(config.get("hidden_dim", args.hidden_dim)),
+        num_heads=int(config.get("num_heads", 4)),
+        num_layers=int(config.get("num_layers", args.num_layers)),
     ).to(device)
     model.load_state_dict(checkpoint["model"])
     model.eval()

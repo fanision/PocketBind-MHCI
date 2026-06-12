@@ -92,3 +92,10 @@ PYTHONPATH=src python3 scripts/train_pocketbind.py \
   --hidden-dim 64 \
   --num-layers 1
 ```
+
+EL pretrain to BA fine-tune smoke path:
+
+```bash
+PYTHONPATH=src python3 scripts/train_pocketbind.py @configs/el_pretrain_c000_smoke.args
+PYTHONPATH=src python3 scripts/train_pocketbind.py @configs/ba_finetune_from_el_c000_smoke.args
+```

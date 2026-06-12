@@ -1,0 +1,19 @@
+--train
+Trainning dataset/NetMHCpan_train/c000_ba
+--task
+ba
+--limit
+256
+--epochs
+1
+--batch-size
+32
+--hidden-dim
+128
+--num-layers
+2
+--init-checkpoint
+artifacts/pocketbind/el_pretrain_c000_smoke.pt
+--out
+artifacts/pocketbind/ba_finetune_from_el_c000_smoke.pt
+
