@@ -47,6 +47,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--val-fraction", type=float, default=0.1)
     parser.add_argument("--seed", type=int, default=13)
+    parser.add_argument(
+        "--balanced-task-sampling",
+        action="store_true",
+        help="Use inverse task-frequency weights for training batches.",
+    )
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument(
         "--sample-rows",
@@ -61,6 +66,8 @@ def parse_args() -> argparse.Namespace:
         default="ba=1.0,el=0.3,iedb=0.5,cedar=0.5",
         help="Comma-separated loss weights.",
     )
+    parser.add_argument("--ba-ranking-weight", type=float, default=0.2)
+    parser.add_argument("--ba-ranking-min-delta", type=float, default=0.05)
     parser.add_argument(
         "--auto-pos-weight",
         action="store_true",
@@ -131,7 +138,30 @@ def collate(batch: list[dict]):
     return out
 
 
-def compute_multitask_loss(outputs, labels, task_ids, *, task_weights, loss_fns):
+def ba_pairwise_ranking_loss(scores, labels, *, min_delta: float):
+    import torch
+
+    if scores.numel() < 2:
+        return scores.new_tensor(0.0)
+    label_delta = labels[:, None] - labels[None, :]
+    score_delta = scores[:, None] - scores[None, :]
+    mask = torch.abs(label_delta) >= min_delta
+    if not torch.any(mask):
+        return scores.new_tensor(0.0)
+    direction = torch.sign(label_delta[mask])
+    return torch.nn.functional.softplus(-direction * score_delta[mask]).mean()
+
+
+def compute_multitask_loss(
+    outputs,
+    labels,
+    task_ids,
+    *,
+    task_weights,
+    loss_fns,
+    ba_ranking_weight,
+    ba_ranking_min_delta,
+):
     import torch
 
     losses = []
@@ -144,6 +174,14 @@ def compute_multitask_loss(outputs, labels, task_ids, *, task_weights, loss_fns)
         weighted = task_weights[task] * task_loss
         losses.append(weighted)
         parts[task] = float(task_loss.detach().cpu())
+        if task == "ba" and ba_ranking_weight > 0:
+            rank_loss = ba_pairwise_ranking_loss(
+                outputs[task][mask],
+                labels[mask],
+                min_delta=ba_ranking_min_delta,
+            )
+            losses.append(ba_ranking_weight * rank_loss)
+            parts["ba_rank"] = float(rank_loss.detach().cpu())
     if not losses:
         raise RuntimeError("Batch did not contain any known task ids.")
     return torch.stack(losses).sum(), parts
@@ -165,6 +203,54 @@ def build_loss_fns(frame: pd.DataFrame, *, auto_pos_weight: bool, device):
     return losses
 
 
+def split_train_val_indices(
+    frame: pd.DataFrame,
+    *,
+    val_fraction: float,
+    seed: int,
+) -> tuple[list[int], list[int]]:
+    rng = np.random.default_rng(seed)
+    train_indices: list[int] = []
+    val_indices: list[int] = []
+    split_frame = frame.reset_index(drop=True).copy()
+    split_frame["binary_label"] = np.where(
+        split_frame["task"].eq("ba"),
+        split_frame["label"] >= 0.426,
+        split_frame["label"] > 0,
+    )
+
+    for _, group in split_frame.groupby(["task", "binary_label"], sort=False):
+        indices = group.index.to_numpy()
+        rng.shuffle(indices)
+        if len(indices) <= 1:
+            train_indices.extend(indices.tolist())
+            continue
+        n_val = int(round(len(indices) * val_fraction))
+        n_val = min(max(1, n_val), len(indices) - 1)
+        val_indices.extend(indices[:n_val].tolist())
+        train_indices.extend(indices[n_val:].tolist())
+
+    rng.shuffle(train_indices)
+    rng.shuffle(val_indices)
+    if not val_indices:
+        raise SystemExit("Validation split is empty; increase dataset size or val_fraction.")
+    return train_indices, val_indices
+
+
+def make_task_balanced_sampler(frame: pd.DataFrame, train_indices: list[int]):
+    import torch
+    from torch.utils.data import WeightedRandomSampler
+
+    tasks = frame.reset_index(drop=True).loc[train_indices, "task"]
+    counts = tasks.value_counts().to_dict()
+    weights = [1.0 / counts[task] for task in tasks]
+    return WeightedRandomSampler(
+        torch.tensor(weights, dtype=torch.double),
+        num_samples=len(train_indices),
+        replacement=True,
+    )
+
+
 def checkpoint_payload(model, *, vocab_size, args, specs, task_weights):
     return {
         "model": model.state_dict(),
@@ -177,6 +263,8 @@ def checkpoint_payload(model, *, vocab_size, args, specs, task_weights):
         "tasks": [task for task, _ in specs],
         "task_weights": task_weights,
         "auto_pos_weight": args.auto_pos_weight,
+        "ba_ranking_weight": args.ba_ranking_weight,
+        "ba_ranking_min_delta": args.ba_ranking_min_delta,
     }
 
 
@@ -199,10 +287,12 @@ def evaluate_loader(model, loader, *, device, task_weights, loss_fns):
                 task_ids,
                 task_weights=task_weights,
                 loss_fns=loss_fns,
+                ba_ranking_weight=0.0,
+                ba_ranking_min_delta=0.0,
             )
             losses.append(float(loss.detach().cpu()))
             for task, value in parts.items():
-                task_losses[task].append(value)
+                task_losses.setdefault(task, []).append(value)
             for task, task_id in TASK_TO_ID.items():
                 mask = task_ids == task_id
                 if not torch.any(mask):
@@ -246,7 +336,7 @@ def flatten_log_row(row: dict) -> dict[str, float | int]:
 def main() -> None:
     try:
         import torch
-        from torch.utils.data import DataLoader, random_split
+        from torch.utils.data import DataLoader, Subset
     except ImportError as exc:
         raise SystemExit("PyTorch is required for training. Install with: pip install torch") from exc
 
@@ -274,15 +364,30 @@ def main() -> None:
 
     vocab = Vocab.amino_acid()
     dataset = EncodedPocketBindDataset(frame, vocab=vocab)
-    val_size = max(1, int(len(dataset) * args.val_fraction))
-    train_size = len(dataset) - val_size
-    train_ds, val_ds = random_split(
-        dataset,
-        [train_size, val_size],
-        generator=torch.Generator().manual_seed(args.seed),
+    train_indices, val_indices = split_train_val_indices(
+        frame,
+        val_fraction=args.val_fraction,
+        seed=args.seed,
     )
-    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, collate_fn=collate)
+    train_ds = Subset(dataset, train_indices)
+    val_ds = Subset(dataset, val_indices)
+    sampler = (
+        make_task_balanced_sampler(frame, train_indices)
+        if args.balanced_task_sampling
+        else None
+    )
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=args.batch_size,
+        shuffle=sampler is None,
+        sampler=sampler,
+        collate_fn=collate,
+    )
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, collate_fn=collate)
+    print(
+        f"split train_rows={len(train_indices)} val_rows={len(val_indices)} "
+        f"balanced_task_sampling={args.balanced_task_sampling}"
+    )
 
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     model = PocketBindModel(
@@ -317,13 +422,15 @@ def main() -> None:
                 task_ids,
                 task_weights=task_weights,
                 loss_fns=loss_fns,
+                ba_ranking_weight=args.ba_ranking_weight,
+                ba_ranking_min_delta=args.ba_ranking_min_delta,
             )
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             optimizer.step()
             losses.append(float(loss.detach().cpu()))
             for task, value in parts.items():
-                task_losses[task].append(value)
+                task_losses.setdefault(task, []).append(value)
 
         val_result = evaluate_loader(
             model,

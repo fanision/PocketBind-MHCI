@@ -9,6 +9,7 @@ cedar=Trainning dataset/NetMHCpan_train/c000_cedar
 --limit
 5000
 --sample-rows
+--balanced-task-sampling
 --epochs
 2
 --batch-size
@@ -22,4 +23,3 @@ ba=1.0,el=0.3,iedb=0.5,cedar=0.5
 --auto-pos-weight
 --out
 artifacts/pocketbind/multitask_c000_sampled.pt
-

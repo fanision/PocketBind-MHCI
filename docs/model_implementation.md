@@ -24,9 +24,7 @@ The current model is a compact implementation of the planned architecture:
 This is intentionally a v1 training scaffold. The next modeling improvements should add:
 
 - Pocket/contact bias for anchor residues
-- Multi-task batch sampling
 - Percentile-rank calibration
-- Pairwise ranking loss for BA
 - EL pretraining followed by BA fine-tuning
 
 ## Smoke Tests
@@ -182,6 +180,23 @@ epoch=2 val_ba_roc_auc=0.642276 val_ba_pearson=0.292168
 
 These sampled results verify the training route, not final performance. The model remains far below the NetMHCpan-4.2 target line at this stage.
 
+Stratified/balanced multi-task smoke with BA ranking loss:
+
+```bash
+PYTHONPATH=src python3 scripts/train_pocketbind.py \
+  @configs/multitask_c000_smoke.args \
+  --epochs 1 \
+  --out artifacts/pocketbind/multitask_rank_smoke.pt
+```
+
+Result:
+
+```text
+split train_rows=1346 val_rows=151 balanced_task_sampling=True
+epoch=1 train_loss=1.565707 val_loss=1.501126
+ba_rank_loss=0.662608 val_ba_roc_auc=0.732955 val_ba_pearson=0.370965
+```
+
 Prediction smoke test:
 
 ```bash
@@ -211,6 +226,9 @@ For fold `c000`:
 - Training ran on CPU in this environment. MPS/GPU support should be checked on the target training machine.
 - `EncodedPocketBindDataset` currently returns Python lists and uses a simple collate function; performance should be improved before full EL pretraining.
 - Multi-task training currently concatenates per-task frames, then uses shuffled mini-batches and masked per-task losses.
+- Multi-task configs use inverse-frequency task-balanced sampling for training batches.
 - Dataset rows are now pre-encoded and cached; if PyTorch is available, numeric fields are cached as tensors.
 - `--sample-rows` should be preferred for smoke/medium experiments because many local files are label-sorted near the top.
+- Validation split is stratified by task and binary label where possible.
+- BA training includes an optional pairwise ranking loss controlled by `--ba-ranking-weight`.
 - Full EL training may still need streaming or sharded caching on memory-constrained machines.

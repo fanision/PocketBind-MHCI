@@ -8,6 +8,8 @@ iedb=Trainning dataset/NetMHCpan_train/c000_iedb
 cedar=Trainning dataset/NetMHCpan_train/c000_cedar
 --limit
 512
+--sample-rows
+--balanced-task-sampling
 --epochs
 1
 --batch-size
@@ -21,4 +23,3 @@ ba=1.0,el=0.3,iedb=0.5,cedar=0.5
 --auto-pos-weight
 --out
 artifacts/pocketbind/multitask_c000_smoke.pt
-

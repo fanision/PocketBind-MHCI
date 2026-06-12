@@ -93,6 +93,8 @@ PYTHONPATH=src python3 scripts/train_pocketbind.py \
   --num-layers 1
 ```
 
+The multi-task configs use stratified validation splits and task-balanced batch sampling.
+
 EL pretrain to BA fine-tune smoke path:
 
 ```bash
