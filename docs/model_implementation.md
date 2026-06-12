@@ -149,6 +149,39 @@ loaded init checkpoint=artifacts/pocketbind/el_pretrain_c000_smoke.pt
 epoch=1 train_loss=0.057812 val_loss=0.025515 rows=214 device=cpu
 ```
 
+Sampled EL pretraining test:
+
+```bash
+PYTHONPATH=src python3 scripts/train_pocketbind.py \
+  @configs/el_pretrain_c000_sampled.args
+```
+
+Result:
+
+```text
+loaded task=el rows=2767
+epoch=1 val_el_roc_auc=0.685288 val_el_auprc=0.080440
+epoch=2 val_el_roc_auc=0.701082 val_el_auprc=0.091568
+```
+
+Sampled BA fine-tune from EL test:
+
+```bash
+PYTHONPATH=src python3 scripts/train_pocketbind.py \
+  @configs/ba_finetune_from_el_c000_sampled.args
+```
+
+Result:
+
+```text
+loaded task=ba rows=4031
+loaded init checkpoint=artifacts/pocketbind/el_pretrain_c000_sampled.pt
+epoch=1 val_ba_roc_auc=0.638653 val_ba_pearson=0.282183
+epoch=2 val_ba_roc_auc=0.642276 val_ba_pearson=0.292168
+```
+
+These sampled results verify the training route, not final performance. The model remains far below the NetMHCpan-4.2 target line at this stage.
+
 Prediction smoke test:
 
 ```bash
@@ -179,4 +212,5 @@ For fold `c000`:
 - `EncodedPocketBindDataset` currently returns Python lists and uses a simple collate function; performance should be improved before full EL pretraining.
 - Multi-task training currently concatenates per-task frames, then uses shuffled mini-batches and masked per-task losses.
 - Dataset rows are now pre-encoded and cached; if PyTorch is available, numeric fields are cached as tensors.
+- `--sample-rows` should be preferred for smoke/medium experiments because many local files are label-sorted near the top.
 - Full EL training may still need streaming or sharded caching on memory-constrained machines.

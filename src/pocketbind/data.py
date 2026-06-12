@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import random
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -41,6 +42,38 @@ def read_pocketbind_table(path: Path, *, has_context: bool, nrows: int | None = 
         names = ["peptide", "label", "allele_raw", "context"]
 
     df = pd.read_csv(path, sep=r"\s+", names=names, engine="python", nrows=nrows)
+    df["source_path"] = str(path)
+    df["label"] = pd.to_numeric(df["label"], errors="coerce")
+    df["allele"] = df["allele_raw"].map(normalize_allele)
+    df["has_valid_allele"] = df["allele"].notna()
+    return df
+
+
+def sample_pocketbind_table(
+    path: Path,
+    *,
+    has_context: bool,
+    nrows: int,
+    seed: int,
+) -> pd.DataFrame:
+    rng = random.Random(seed)
+    rows: list[list[str]] = []
+    seen = 0
+    with path.open() as handle:
+        for line in handle:
+            parts = line.split()
+            if len(parts) < 4:
+                continue
+            seen += 1
+            if len(rows) < nrows:
+                rows.append(parts[:4])
+                continue
+            j = rng.randrange(seen)
+            if j < nrows:
+                rows[j] = parts[:4]
+
+    names = ["peptide", "label", "allele_raw", "context"]
+    df = pd.DataFrame(rows, columns=names)
     df["source_path"] = str(path)
     df["label"] = pd.to_numeric(df["label"], errors="coerce")
     df["allele"] = df["allele_raw"].map(normalize_allele)

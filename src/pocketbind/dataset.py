@@ -5,7 +5,7 @@ from typing import Any
 
 import pandas as pd
 
-from pocketbind.data import normalize_allele, read_pocketbind_table
+from pocketbind.data import normalize_allele, read_pocketbind_table, sample_pocketbind_table
 from pocketbind.encoding import Vocab, make_context
 
 
@@ -33,8 +33,13 @@ class PocketBindFrameBuilder:
         task: str,
         has_context: bool,
         nrows: int | None = None,
+        sample_rows: bool = False,
+        seed: int = 13,
     ) -> pd.DataFrame:
-        df = read_pocketbind_table(path, has_context=has_context, nrows=nrows)
+        if sample_rows and nrows is not None:
+            df = sample_pocketbind_table(path, has_context=has_context, nrows=nrows, seed=seed)
+        else:
+            df = read_pocketbind_table(path, has_context=has_context, nrows=nrows)
         df = df.loc[df["has_valid_allele"]].copy()
         df["task"] = task
         df["hla_pseudoseq"] = df["allele"].map(self.pseudoseqs)

@@ -1,0 +1,19 @@
+--train-spec
+el=Trainning dataset/NetMHCpan_train/c000_el
+--limit
+10000
+--sample-rows
+--epochs
+2
+--batch-size
+128
+--hidden-dim
+128
+--num-layers
+2
+--task-weights
+el=1.0
+--auto-pos-weight
+--out
+artifacts/pocketbind/el_pretrain_c000_sampled.pt
+
