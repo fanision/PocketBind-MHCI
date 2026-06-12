@@ -1,0 +1,15 @@
+[project]
+name = "pocketbind-mhci"
+version = "0.1.0"
+description = "PocketBind-MHCI baseline and modeling utilities."
+requires-python = ">=3.11"
+dependencies = [
+  "numpy",
+  "pandas",
+  "scikit-learn",
+  "scipy",
+]
+
+[tool.ruff]
+line-length = 100
+

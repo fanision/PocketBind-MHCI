@@ -53,3 +53,13 @@ See [`docs/development_plan.md`](docs/development_plan.md) for details.
 - [`docs/conversation_summary.md`](docs/conversation_summary.md): project conversation and decisions so far
 - [`docs/development_plan.md`](docs/development_plan.md): proposed model, data, and training plan
 - [`docs/netmhcpan42_baseline.md`](docs/netmhcpan42_baseline.md): first baseline plan
+- [`docs/baseline_results.md`](docs/baseline_results.md): first NetMHCpan-4.2 baseline results
+
+## Baseline Smoke Test
+
+```bash
+PYTHONPATH=src python3 scripts/run_netmhcpan_baseline.py \
+  --input "Trainning dataset/NetMHCpan_eval/cedar_test" \
+  --task cedar \
+  --limit 20
+```
